@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - Railway Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .profile-container { max-width: 450px; margin: 30px auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #f1f1f1; padding-bottom: 15px; }
+        .user-icon { font-size: 4.5rem; color: #0d6efd; }
+        .section-box { background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 15px; }
+        .btn-custom { padding: 12px; font-weight: 600; margin-bottom: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        #securitySection { background: #fff9e6; border-color: #ffeeba; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="profile-container">
+        <div class="header">
+            <div class="user-icon"><i class="bi bi-person-circle"></i></div>
+            <h4 id="displayUserName" class="fw-bold mt-2">Loading...</h4>
+            <p id="displayUserEmail" class="text-muted small">...</p>
+        </div>
+
+        <div id="securitySection" class="section-box">
+            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-lock"></i> Edit User Details (Password)</h6>
+            <input type="password" id="oldPass" class="form-control mb-2" placeholder="Current Password">
+            <input type="password" id="newPass" class="form-control mb-2" placeholder="New Password">
+            <input type="password" id="confirmPass" class="form-control mb-3" placeholder="Confirm New Password">
+            
+            <button id="updateBtn" class="btn btn-success w-100 fw-bold" onclick="updatePassword()">
+                Update Password
+            </button>
+        </div>
+
+        <div class="section-box">
+            <h6 class="fw-bold text-primary mb-3">Quick Actions</h6>
+            <button class="btn btn-primary w-100 btn-custom shadow-sm" onclick="window.location.href='my-bookings.html'">
+                <i class="bi bi-ticket-perforated"></i> My Bookings
+            </button>
+            <button class="btn btn-outline-secondary w-100 btn-custom" onclick="window.location.href='dashboard.html'">
+                <i class="bi bi-house"></i> Home Dashboard
+            </button>
+        </div>
+
+        <button class="btn btn-danger w-100 btn-custom shadow-sm" onclick="logout()">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </button>
+    </div>
+</div>
+
+<script>
+    // ⭐ FIXED TO LOCALHOST ⭐
+    const API_BASE = "http://localhost:5000"; 
+    const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("user_id");
+
+    // Profile Data Load from LocalStorage
+    document.getElementById("displayUserName").innerText = localStorage.getItem("user_name") || "Railway User";
+    document.getElementById("displayUserEmail").innerText = localStorage.getItem("user_email") || "Email Not Found";
+
+    async function updatePassword() {
+        const oldPass = document.getElementById("oldPass").value;
+        const newPass = document.getElementById("newPass").value;
+        const confirmPass = document.getElementById("confirmPass").value;
+
+        if(!oldPass || !newPass || !confirmPass) return alert("Ellaa details-um fill pannunga!");
+        if(newPass !== confirmPass) return alert("New passwords match aagala!");
+
+        const btn = document.getElementById("updateBtn");
+        btn.disabled = true;
+        btn.innerText = "Updating...";
+
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ userId, oldPass, newPass })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alert("✅ Success! Password updated locally.");
+                location.reload();
+            } else {
+                alert("❌ Error: " + data.message);
+                btn.disabled = false;
+                btn.innerText = "Update Password";
+            }
+        } catch (err) {
+            console.error("Connection Error:", err);
+            alert("❌ Connection Error: Node.js server run aagudha-nu check pannunga.");
+            btn.disabled = false;
+            btn.innerText = "Update Password";
+        }
+    }
+
+    function logout() { 
+        localStorage.clear(); 
+        window.location.href = "index.html"; 
+    }
+</script>
+</body>
+</html>

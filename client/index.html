@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railway Reservation - Welcome</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin: 0;
+        }
+        .navbar {
+            background-color: rgba(13, 110, 253, 0.9) !important;
+            backdrop-filter: blur(5px);
+            position: absolute;
+            top: 0;
+            width: 100%;
+        }
+        .welcome-section {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 50px 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            max-width: 600px;
+            margin: auto;
+            text-align: center;
+        }
+        h2 { font-weight: 800; color: #212529; }
+        .btn-custom {
+            padding: 12px 30px;
+            font-weight: bold;
+            transition: 0.3s;
+            border-radius: 10px;
+        }
+        .btn-custom:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark shadow">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="index.html">🚂 RAILWAY RESERVATION</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="welcome-section">
+        <h2 class="mb-3">Easy Ticket Booking for Your Next Journey</h2>
+        <p class="text-muted mb-4">Search trains, check availability, and download your ticket in seconds.</p>
+        
+        <div id="authButtons" class="d-flex justify-content-center gap-3">
+            <a href="login.html" class="btn btn-primary btn-lg btn-custom">Login</a>
+            <a href="register.html" class="btn btn-outline-success btn-lg btn-custom">Register</a>
+        </div>
+        
+        <div id="userGreeting" class="d-none">
+            <h4 class="mb-1 text-primary">Welcome Back, <span id="welcomeName">Traveler</span>!</h4>
+            <p class="text-muted mb-4">Ready to plan your next journey?</p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="dashboard.html" class="btn btn-success btn-lg btn-custom">Go to Dashboard</a>
+                <button onclick="logout()" class="btn btn-outline-danger btn-lg btn-custom">Logout</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    window.onload = function() {
+        const token = localStorage.getItem("token");
+        const userName = localStorage.getItem("user_name");
+
+        // Token irundha mattum Dashboard kaatu
+        if (token && token !== "undefined" && token !== null) {
+            document.getElementById("authButtons").classList.add("d-none");
+            document.getElementById("userGreeting").classList.remove("d-none");
+            if(userName) {
+                document.getElementById("welcomeName").innerText = userName;
+            }
+        }
+    };
+
+    function logout() {
+        if(confirm("Are you sure you want to logout?")) {
+            localStorage.clear();
+            window.location.reload(); 
+        }
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
