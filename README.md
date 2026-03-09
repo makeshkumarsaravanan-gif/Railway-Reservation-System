@@ -17,7 +17,7 @@ Category	Technology	Purpose
 🎫 Documents	pdfkit & qrcode	Dynamic QR-Embedded PDF Ticket Generation
 🏗️ 2. Core Engineering Logic (The "Pro" Flow)
 
-Mam kitta explain pannum podhu indha Professional Flow-ah step-by-step-ah sollunga:
+ Professional Flow
 
     🔒 Identity Verification: User booking start pannona, nodemailer moolamaa oru 6-digit Secure OTP avanga mail-ku pogum.
 
@@ -86,5 +86,6 @@ Vera system-la project-ah run panna indha steps-ah follow pannunga:
     npm install nodemailer qrcode pdfkit express mysql2 jsonwebtoken bcrypt dotenv
 
     ⚙️ Configuration: .env file-la unga MySQL credentials & Gmail App Password-ah configure pannunga.
+
 
     🔥 Launch: node app.js kudutha server Port 5000-la flight-ah kelambidum!
