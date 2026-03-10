@@ -33,10 +33,9 @@
     </div>
 </div>
 
-
-
 <script>
-const API_BASE = "http://localhost:5000";
+// ⭐ FIX: DYNAMIC API URL (Mobile & Laptop Support) ⭐
+const API_BASE = window.location.origin;
 const token = localStorage.getItem("token");
 
 if(!token) { 
@@ -45,7 +44,6 @@ if(!token) {
 
 async function loadBookings() {
     try {
-        // ⭐ API Route: /api/users/my-bookings
         const res = await fetch(`${API_BASE}/api/users/my-bookings`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -94,12 +92,12 @@ async function loadBookings() {
         `).join("");
     } catch(err) {
         document.getElementById("bookingsList").innerHTML = `
-            <div class="alert alert-danger">Failed to load bookings. Check if server is running!</div>`;
+            <div class="alert alert-danger">Failed to load bookings. Ensure server is running!</div>`;
     }
 }
 
 function downloadTicket(pnr) {
-    // Ticket download route logic
+    // ⭐ Ticket download link-um dynamic-ah irukkanum
     window.location.href = `${API_BASE}/api/bookings/ticket/${pnr}`;
 }
 

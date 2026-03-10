@@ -74,14 +74,11 @@
     </div>
 </div>
 
-
-
 <script>
     window.onload = function() {
         const token = localStorage.getItem("token");
         const userName = localStorage.getItem("user_name");
 
-        // Token irundha mattum Dashboard kaatu
         if (token && token !== "undefined" && token !== null) {
             document.getElementById("authButtons").classList.add("d-none");
             document.getElementById("userGreeting").classList.remove("d-none");

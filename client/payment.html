@@ -57,8 +57,8 @@
 </div>
 
 <script>
-// ⭐ FIXED TO LOCALHOST ⭐
-const API_BASE = "http://localhost:5000";
+// ⭐ FIX: DYNAMIC API URL (Mobile & Laptop) ⭐
+const API_BASE = window.location.origin;
 
 const token = localStorage.getItem("token");
 const bookingData = JSON.parse(localStorage.getItem("bookingData"));
@@ -104,7 +104,7 @@ async function loadSummary() {
         document.getElementById("bookingSummary").innerHTML = `
             <div class="alert alert-danger text-center">
                 ⚠️ Connection Error! <br> 
-                Check if Terminal-la 'node app.js' run aagudha-nu paarunga.
+                Server run aagudha-nu check pannunga.
             </div>`;
     }
 }
@@ -139,6 +139,7 @@ async function processPayment(method) {
             document.getElementById("headerTitle").innerText = "Success!";
             document.getElementById("headerTitle").style.background = "#198754";
             
+            // ⭐ SUCCESS SCREEN ⭐
             document.getElementById("mainCard").innerHTML = `
                 <div class="card-body text-center py-5">
                     <div class="success-icon">✅</div>
@@ -161,7 +162,7 @@ async function processPayment(method) {
         }
     } catch (err) {
         console.error("Payment error:", err);
-        alert("Server connection failed. Node.js check pannunga!");
+        alert("Server connection failed!");
         paySection.innerHTML = originalContent;
     }
 }

@@ -71,13 +71,10 @@
     </p>
 </div>
 
-
-
 <script>
-// ⭐ FIXED TO LOCALHOST ⭐
-const API_BASE = "http://localhost:5000";
+// ⭐ FIX: DYNAMIC API URL (Laptop/Mobile rendukum work aagum)
+const API_BASE = window.location.origin;
 
-// Already login aagi irundha dashboard-ku anupidu
 window.onload = () => {
     if(localStorage.getItem("token")) {
         window.location.href = "dashboard.html";
@@ -104,7 +101,6 @@ async function register() {
     regBtn.disabled = true;
 
     try {
-        // Localhost backend-ku register request anupudhu
         const response = await fetch(`${API_BASE}/api/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -121,7 +117,7 @@ async function register() {
         }
     } catch (err) {
         console.error("Fetch Error:", err);
-        alert("❌ Server Connection Fail! Terminal-la 'node app.js' run aagudhaa-nu check pannunga.");
+        alert("❌ Server Connection Fail! Terminal-la server run aagudha-nu check pannunga.");
     } finally {
         regBtn.innerText = "Register Now";
         regBtn.disabled = false;

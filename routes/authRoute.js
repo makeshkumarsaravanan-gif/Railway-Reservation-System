@@ -61,42 +61,52 @@ router.post('/login', async (req, res, next) => {
     } catch (error) { next(error); }
 });
 
-// ⭐ CHANGE PASSWORD API ⭐
-router.post('/change-password', async (req, res, next) => {
-    const { userId, oldPass, newPass } = req.body;
+// ⭐ NEW: RESET PASSWORD VIA OTP ⭐
+// Indha route-ah thaan profile.html-la verifyAndChange() function call pannum
+router.post('/reset-password', async (req, res, next) => {
+    const { userId, newPass } = req.body;
 
-    if (!userId || !oldPass || !newPass) {
-        return res.status(400).json({ message: 'All fields are required' });
+    if (!userId || !newPass) {
+        return res.status(400).json({ message: 'User ID and New Password are required' });
     }
 
     try {
-        // 1. Database-la user data fetch panradhu
-        const [users] = await db.query('SELECT password FROM users WHERE id = ?', [userId]);
-        
-        if (users.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const user = users[0];
-
-        // 2. Old Password-ah verify panradhu
-        const isMatch = await bcrypt.compare(oldPass, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Current password is incorrect' });
-        }
-
-        // 3. New Password-ah hash panradhu
+        // 1. New Password-ah hash panradhu
         const salt = await bcrypt.genSalt(10);
         const hashedNewPassword = await bcrypt.hash(newPass, salt);
 
-        // 4. Database-la update panradhu
-        await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedNewPassword, userId]);
+        // 2. Database-la direct-ah update panradhu (OTP verify aanadhala)
+        const [result] = await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedNewPassword, userId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
         res.json({ success: true, message: 'Password updated successfully! ✅' });
 
     } catch (error) {
         next(error);
     }
+});
+
+// (Keep existing change-password for backward compatibility if needed)
+router.post('/change-password', async (req, res, next) => {
+    const { userId, oldPass, newPass } = req.body;
+    if (!userId || !oldPass || !newPass) return res.status(400).json({ message: 'All fields are required' });
+
+    try {
+        const [users] = await db.query('SELECT password FROM users WHERE id = ?', [userId]);
+        if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+        
+        const isMatch = await bcrypt.compare(oldPass, users[0].password);
+        if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedNewPassword = await bcrypt.hash(newPass, salt);
+        await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedNewPassword, userId]);
+
+        res.json({ success: true, message: 'Password updated successfully!' });
+    } catch (error) { next(error); }
 });
 
 module.exports = router;

@@ -14,6 +14,7 @@
         .section-box { background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 15px; }
         .btn-custom { padding: 12px; font-weight: 600; margin-bottom: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         #securitySection { background: #fff9e6; border-color: #ffeeba; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -27,23 +28,32 @@
         </div>
 
         <div id="securitySection" class="section-box">
-            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-lock"></i> Edit User Details (Password)</h6>
-            <input type="password" id="oldPass" class="form-control mb-2" placeholder="Current Password">
-            <input type="password" id="newPass" class="form-control mb-2" placeholder="New Password">
-            <input type="password" id="confirmPass" class="form-control mb-3" placeholder="Confirm New Password">
+            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-lock"></i> Security Settings</h6>
             
-            <button id="updateBtn" class="btn btn-success w-100 fw-bold" onclick="updatePassword()">
-                Update Password
-            </button>
+            <div id="otpStep">
+                <p class="small text-muted">Password maathuna OTP verify pannanum.</p>
+                <button id="sendOtpBtn" class="btn btn-warning w-100 fw-bold mb-2" onclick="sendOTP()">
+                    Send OTP to Email
+                </button>
+            </div>
+
+            <div id="passwordStep" class="hidden">
+                <div class="alert alert-info small py-2">OTP Sent! Adhai inge enter pannunga.</div>
+                <input type="text" id="otpInput" class="form-control mb-2" placeholder="Enter 4-Digit OTP">
+                <hr>
+                <input type="password" id="newPass" class="form-control mb-2" placeholder="New Password">
+                <input type="password" id="confirmPass" class="form-control mb-3" placeholder="Confirm New Password">
+                
+                <button id="updateBtn" class="btn btn-success w-100 fw-bold" onclick="verifyAndChange()">
+                    Verify & Update Password
+                </button>
+            </div>
         </div>
 
         <div class="section-box">
             <h6 class="fw-bold text-primary mb-3">Quick Actions</h6>
             <button class="btn btn-primary w-100 btn-custom shadow-sm" onclick="window.location.href='my-bookings.html'">
                 <i class="bi bi-ticket-perforated"></i> My Bookings
-            </button>
-            <button class="btn btn-outline-secondary w-100 btn-custom" onclick="window.location.href='dashboard.html'">
-                <i class="bi bi-house"></i> Home Dashboard
             </button>
         </div>
 
@@ -54,51 +64,85 @@
 </div>
 
 <script>
-    // ⭐ FIXED TO LOCALHOST ⭐
-    const API_BASE = "http://localhost:5000"; 
+    // ⭐ DYNAMIC API BASE ⭐
+    const API_BASE = window.location.origin; 
     const token = localStorage.getItem("token");
+    const userEmail = localStorage.getItem("user_email");
     const userId = localStorage.getItem("user_id");
 
-    // Profile Data Load from LocalStorage
-    document.getElementById("displayUserName").innerText = localStorage.getItem("user_name") || "Railway User";
-    document.getElementById("displayUserEmail").innerText = localStorage.getItem("user_email") || "Email Not Found";
+    let serverOTP = ""; // OTP-ah store panna
 
-    async function updatePassword() {
-        const oldPass = document.getElementById("oldPass").value;
+    document.getElementById("displayUserName").innerText = localStorage.getItem("user_name") || "Railway User";
+    document.getElementById("displayUserEmail").innerText = userEmail || "Email Not Found";
+
+    // 1. Send OTP Function
+    async function sendOTP() {
+        if(!userEmail) return alert("User email kidaikala!");
+
+        const btn = document.getElementById("sendOtpBtn");
+        btn.disabled = true;
+        btn.innerText = "Sending...";
+
+        try {
+            const res = await fetch(`${API_BASE}/api/bookings/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userEmail })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                serverOTP = data.otp; // Backend-la irundhu vara OTP
+                alert("✅ OTP unga email-ku anupiyaachu!");
+                document.getElementById("otpStep").classList.add("hidden");
+                document.getElementById("passwordStep").classList.remove("hidden");
+            } else {
+                alert("❌ OTP anupa mudiyala!");
+                btn.disabled = false;
+                btn.innerText = "Send OTP to Email";
+            }
+        } catch (err) {
+            alert("❌ Server connection error!");
+            btn.disabled = false;
+        }
+    }
+
+    // 2. Verify OTP and Change Password
+    async function verifyAndChange() {
+        const userEnteredOtp = document.getElementById("otpInput").value;
         const newPass = document.getElementById("newPass").value;
         const confirmPass = document.getElementById("confirmPass").value;
 
-        if(!oldPass || !newPass || !confirmPass) return alert("Ellaa details-um fill pannunga!");
-        if(newPass !== confirmPass) return alert("New passwords match aagala!");
+        if(!userEnteredOtp) return alert("OTP type pannunga!");
+        if(userEnteredOtp != serverOTP) return alert("❌ Thappana OTP!");
+        if(newPass.length < 6) return alert("Password min 6 characters irukanum!");
+        if(newPass !== confirmPass) return alert("Passwords match aagala!");
 
         const btn = document.getElementById("updateBtn");
         btn.disabled = true;
         btn.innerText = "Updating...";
 
         try {
-            const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+            // Backend-la intha route (/api/auth/reset-password) irukanum
+            const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}` 
                 },
-                body: JSON.stringify({ userId, oldPass, newPass })
+                body: JSON.stringify({ userId, newPass })
             });
 
-            const data = await res.json();
             if (res.ok) {
-                alert("✅ Success! Password updated locally.");
+                alert("✅ Password successfully changed!");
                 location.reload();
             } else {
-                alert("❌ Error: " + data.message);
+                alert("❌ Update failed! Try again.");
                 btn.disabled = false;
-                btn.innerText = "Update Password";
             }
         } catch (err) {
-            console.error("Connection Error:", err);
-            alert("❌ Connection Error: Node.js server run aagudha-nu check pannunga.");
+            alert("❌ Server Error!");
             btn.disabled = false;
-            btn.innerText = "Update Password";
         }
     }
 

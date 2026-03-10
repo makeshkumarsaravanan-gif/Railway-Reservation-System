@@ -11,12 +11,12 @@ const authRoute = require("./routes/authRoute");
 
 const app = express(); 
 
-// ✅ Middleware
+// ✅ FIX: Mobile connectivity and CORS
 app.use(cors());
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ IMPORTANT: 'public'-ku pathila 'client' nu mathirukaen
+// ✅ FIX: Serving the 'client' folder
 app.use(express.static(path.join(__dirname, 'client')));
 
 // ✅ Routes Mapping
@@ -25,27 +25,15 @@ app.use("/api/users", userRoutes);
 app.use("/api/trains", trainRoutes);
 app.use("/api/bookings", bookingRoutes);
 
-// ✅ Default Route
+// ✅ FIX: Default route to load index.html
 app.get("/", (req, res) => {
-    // Inga 'client' folder-kulla irukura index.html-ah anupum
     res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
-// Test-kaga status route
-app.get("/status", (req, res) => {
-    res.status(200).send("🚂 Railway Reservation API is Live!");
-});
-
-// ✅ Error Handler
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(err.status || 500).json({
-        success: false,
-        message: err.message || "Internal Server Error"
-    });
-});
-
+// ✅ FIX: IP Binding for Ngrok (0.0.0.0 is MUST)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 Server running on Port ${PORT}`);
+    console.log(`💻 Local: http://localhost:${PORT}`);
+    console.log(`📱 Mobile: Use the Ngrok URL\n`);
 });
