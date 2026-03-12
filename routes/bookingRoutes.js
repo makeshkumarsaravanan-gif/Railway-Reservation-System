@@ -8,16 +8,19 @@ const QRCode = require('qrcode');
 
 const SECRET = process.env.JWT_SECRET || "supersecretkey";
 
+// OTP temporary storage
+let cancellationOTPs = {};
+
 // 📧 1. Nodemailer Setup
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: 'makeshkumarsaravanan@gmail.com',
-        pass: 'jthr cqpo lviw pntr' // App Password
+        pass: 'jthr cqpo lviw pntr' // Gmail App Password
     }
 });
 
-// 🛡️ Middleware: Token verify panna
+// 🛡️ Middleware: Token verification
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(" ")[1];
@@ -30,7 +33,7 @@ const verifyToken = (req, res, next) => {
     });
 };
 
-// ⚡ 2. Route: Booking OTP anuppa
+// ⚡ 2. Route: Send Booking OTP (Initial booking process)
 router.post('/send-otp', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
@@ -49,25 +52,55 @@ router.post('/send-otp', async (req, res) => {
     }
 });
 
-// ⚡ 3. Route: Cancellation OTP anuppa
+// ⚡ 3. Route: Send Cancellation OTP
 router.post('/send-cancel-otp', verifyToken, async (req, res) => {
-    const { pnr, email } = req.body;
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    const mailOptions = {
-        from: 'makeshkumarsaravanan@gmail.com',
-        to: email,
-        subject: 'Ticket Cancellation OTP',
-        text: `OTP to cancel your PNR ${pnr} is: ${otp}. Valid for 5 minutes.`
-    };
+    const { pnr } = req.body;
+    if (!pnr) return res.status(400).json({ success: false, message: "PNR is required" });
+
     try {
+        const [rows] = await db.query(
+            'SELECT p.email FROM passengers p JOIN bookings b ON p.booking_id = b.id WHERE b.pnr = ? LIMIT 1', 
+            [pnr]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: "No booking found" });
+        }
+
+        const targetEmail = rows[0].email;
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        
+        cancellationOTPs[pnr] = {
+            otp: otp,
+            expires: Date.now() + 300000 
+        };
+
+        const mailOptions = {
+            from: 'makeshkumarsaravanan@gmail.com',
+            to: targetEmail,
+            subject: 'Ticket Cancellation OTP - SmartRail',
+            text: `Your OTP to cancel PNR ${pnr} is: ${otp}. Valid for 5 minutes.`
+        };
+
+        // ✅ IMPORTANT: Wait for mail and then RETURN response
         await transporter.sendMail(mailOptions);
-        res.status(200).json({ success: true, otp: otp });
+        
+        // Frontend-ku success signal anupuroam
+        return res.status(200).json({ 
+            success: true, 
+            message: "OTP sent successfully" 
+        });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: "OTP failed" });
+        console.error("Mail Error:", error);
+        // Error vanthaalum return pannanum
+        if (!res.headersSent) {
+            return res.status(500).json({ success: false, message: "Failed to send OTP email" });
+        }
     }
 });
 
-// 🎟️ 4. Route: Book Ticket (With QR Code & PDF Mail)
+// 🎟️ 4. Route: Book Ticket
 router.post('/book', async (req, res) => {
     const { user_id, train_id, seats, seat_numbers, passengers, paymentMethod } = req.body;
 
@@ -111,11 +144,9 @@ router.post('/book', async (req, res) => {
 
         await connection.commit();
 
-        // 🛡️ QR Code Generation
-        const qrContent = `PNR: ${pnr}\nTrain: ${train.train_name}\nRoute: ${train.source}-${train.destination}\nSeats: ${seat_numbers.join(',')}`;
+        const qrContent = `PNR: ${pnr}\nTrain: ${train.train_name}\nRoute: ${train.source}-${train.destination}`;
         const qrImage = await QRCode.toDataURL(qrContent);
 
-        // 📧 PDF & Mail logic
         const doc = new PDFDocument({ margin: 50 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
@@ -140,7 +171,7 @@ router.post('/book', async (req, res) => {
         });
         doc.end();
 
-        res.status(201).json({ success: true, message: 'Booking Confirmed & Ticket Sent', pnr });
+        res.status(201).json({ success: true, message: 'Booking Confirmed', pnr });
 
     } catch (err) {
         if (connection) await connection.rollback();
@@ -150,7 +181,52 @@ router.post('/book', async (req, res) => {
     }
 });
 
-// 🔍 5. Route: Get Booked Seats
+// ❌ 5. Route: Cancel Ticket (Verifies OTP)
+router.post('/cancel', verifyToken, async (req, res) => {
+    const { pnr, otp } = req.body;
+    
+    // OTP verification
+    const storedData = cancellationOTPs[pnr];
+    if (!storedData || storedData.otp != otp) {
+        return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+    if (Date.now() > storedData.expires) {
+        delete cancellationOTPs[pnr];
+        return res.status(400).json({ success: false, message: 'OTP Expired' });
+    }
+
+    let connection;
+    try {
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        const [booking] = await connection.query('SELECT * FROM bookings WHERE pnr = ? AND user_id = ?', [pnr, req.userId]);
+        if (booking.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        
+        if (booking[0].status === 'CANCELLED') {
+            await connection.rollback();
+            return res.status(400).json({ success: false, message: 'Already Cancelled' });
+        }
+
+        await connection.query('UPDATE bookings SET status = "CANCELLED" WHERE pnr = ?', [pnr]);
+        await connection.query('UPDATE trains SET total_seats = total_seats + ? WHERE id = ?', [booking[0].seats, booking[0].train_id]);
+        
+        await connection.commit();
+        delete cancellationOTPs[pnr];
+
+        res.json({ success: true, message: 'Ticket Cancelled Successfully' });
+    } catch (err) {
+        if (connection) await connection.rollback();
+        res.status(500).json({ success: false, message: err.message });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// 🔍 6. Route: Get Booked Seats
 router.get('/booked/:trainId', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT seat_numbers FROM bookings WHERE train_id = ? AND status != "CANCELLED"', [req.params.trainId]);
@@ -158,30 +234,7 @@ router.get('/booked/:trainId', async (req, res) => {
         rows.forEach(row => { if (row.seat_numbers) bookedSeats = bookedSeats.concat(row.seat_numbers.split(',')); });
         res.status(200).json({ bookedSeats });
     } catch (err) {
-        res.status(500).json({ bookedSeats: [], message: "Error" });
-    }
-});
-
-// ❌ 6. Route: Cancel Ticket
-router.put('/cancel/:pnr', verifyToken, async (req, res) => {
-    const pnr = req.params.pnr;
-    let connection;
-    try {
-        connection = await db.getConnection();
-        await connection.beginTransaction();
-        const [booking] = await connection.query('SELECT * FROM bookings WHERE pnr = ? AND user_id = ?', [pnr, req.userId]);
-        if (booking.length === 0) return res.status(404).json({ success: false, message: 'Not found' });
-        
-        await connection.query('UPDATE bookings SET status = "CANCELLED" WHERE pnr = ?', [pnr]);
-        await connection.query('UPDATE trains SET total_seats = total_seats + ? WHERE id = ?', [booking[0].seats, booking[0].train_id]);
-        
-        await connection.commit();
-        res.json({ success: true, message: 'Ticket Cancelled' });
-    } catch (err) {
-        if (connection) await connection.rollback();
-        res.status(500).json({ success: false, message: err.message });
-    } finally {
-        if (connection) connection.release();
+        res.status(500).json({ bookedSeats: [] });
     }
 });
 
@@ -198,7 +251,7 @@ router.get('/user/:userId', async (req, res) => {
     }
 });
 
-// 📄 8. Route: Download PDF (Manual Download with QR Code)
+// 📄 8. Route: Download Ticket
 router.get('/ticket/:pnr', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -211,32 +264,19 @@ router.get('/ticket/:pnr', async (req, res) => {
         if (rows.length === 0) return res.status(404).send('Ticket not found');
 
         const doc = new PDFDocument({ margin: 50 });
-        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=Ticket_${req.params.pnr}.pdf`);
         doc.pipe(res);
 
-        // ⭐ Generate QR for PDF
-        const qrData = `PNR: ${rows[0].pnr} | Train: ${rows[0].train_name} | Route: ${rows[0].source}-${rows[0].destination}`;
+        const qrData = `PNR: ${rows[0].pnr} | Train: ${rows[0].train_name}`;
         const qrImage = await QRCode.toDataURL(qrData);
 
         doc.fontSize(22).text('RAILWAY E-TICKET', { align: 'center', underline: true });
-        doc.image(qrImage, 450, 50, { width: 90 }); // QR Position
-        
-        doc.moveDown().fontSize(14).text(`PNR: ${rows[0].pnr}`);
-        doc.text(`Train: ${rows[0].train_name}`);
-        doc.text(`From: ${rows[0].source} To: ${rows[0].destination}`);
-        doc.text(`Status: ${rows[0].status}`);
-        doc.moveDown();
-
-        doc.fontSize(12).text('PASSENGERS:', { underline: true });
-        rows.forEach((p, i) => {
-            doc.text(`${i + 1}. ${p.p_name} | Age: ${p.age} | Seat: ${p.seat_number}`);
-        });
-
+        doc.image(qrImage, 450, 50, { width: 90 }); 
+        doc.moveDown().fontSize(14).text(`PNR: ${rows[0].pnr}\nTrain: ${rows[0].train_name}\nStatus: ${rows[0].status}`);
         doc.end();
     } catch (err) { 
-        res.status(500).send('Error generating PDF'); 
+        res.status(500).send('Error'); 
     }
 });
 
