@@ -144,7 +144,9 @@ router.post('/book', async (req, res) => {
 
         await connection.commit();
 
-        const qrContent = `PNR: ${pnr}\nTrain: ${train.train_name}\nRoute: ${train.source}-${train.destination}`;
+        // ⭐ UPDATED QR LOGIC - ADDED FULL DETAILS ⭐
+        const pNames = passengers.map(p => `${p.name}(${p.age})`).join(", ");
+        const qrContent = `PNR: ${pnr}\nTrain: ${train.train_name}\nRoute: ${train.source}-${train.destination}\nTravelers: ${pNames}`;
         const qrImage = await QRCode.toDataURL(qrContent);
 
         const doc = new PDFDocument({ margin: 50 });
@@ -268,12 +270,21 @@ router.get('/ticket/:pnr', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=Ticket_${req.params.pnr}.pdf`);
         doc.pipe(res);
 
-        const qrData = `PNR: ${rows[0].pnr} | Train: ${rows[0].train_name}`;
+        // ⭐ UPDATED QR DATA: ADDED ROUTE AND PASSENGERS ⭐
+        const passList = rows.map(r => `${r.p_name}(${r.age})`).join(", ");
+        const qrData = `PNR: ${rows[0].pnr}\nTrain: ${rows[0].train_name}\nRoute: ${rows[0].source} to ${rows[0].destination}\nPassengers: ${passList}`;
         const qrImage = await QRCode.toDataURL(qrData);
 
         doc.fontSize(22).text('RAILWAY E-TICKET', { align: 'center', underline: true });
-        doc.image(qrImage, 450, 50, { width: 90 }); 
+        doc.image(qrImage, 430, 50, { width: 100 }); 
         doc.moveDown().fontSize(14).text(`PNR: ${rows[0].pnr}\nTrain: ${rows[0].train_name}\nStatus: ${rows[0].status}`);
+        
+        // Adding detailed passenger list to PDF for clarity
+        doc.moveDown().text('Passenger Details:');
+        rows.forEach((r, i) => {
+            doc.text(`${i+1}. ${r.p_name} | Age: ${r.age} | Seat: ${r.seat_number}`);
+        });
+
         doc.end();
     } catch (err) { 
         res.status(500).send('Error'); 
